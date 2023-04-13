@@ -26,7 +26,7 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
     constructor() ERC721("Wom3nNFT", "WMNFT") {
         baseUrl = "https://bafybeihocfptf5aemeo3iuk6hi6ibccbfjemco4xuwzs7sexxqjpssolee.ipfs.nftstorage.link/";
         mintingAllowed = true;
-        transferAllowed = true;
+        transferAllowed = false;
         _tokenIds.increment();
     }
 
@@ -102,6 +102,12 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
         }
     }
 
+    function removeFromAllowlist(address[] calldata users) external onlyOwner {
+        for (uint256 i = 0; i < users.length; i++) {
+            allowlist[users[i]] = false;
+        }
+    }
+
     // only allow token transfers if the transferAllowed flag is set to true or
     // if the operation is a minting or burning operation or the sender is owner
     function _beforeTokenTransfer(
@@ -130,8 +136,7 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
         _setTokenURI(tokenId, newURI);
     }
 
-
-    function contractURI() public view returns (string memory) {
+    function contractURI() public pure returns (string memory) {
         string memory name = "wom3n.DAO NFT Series #1";
         string
             memory description = "wom3n.DAO - the dynamic hub for the next-gen digital female leaders and creatives, igniting innovation, growth, and impact in Web3.";
