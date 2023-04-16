@@ -4,6 +4,7 @@ require("hardhat-contract-sizer");
 require("hardhat-gas-reporter");
 require("solidity-coverage");
 require("@nomiclabs/hardhat-waffle");
+require("@nomiclabs/hardhat-etherscan");
 
 const dotenv = require("dotenv");
 dotenv.config();
@@ -26,6 +27,11 @@ module.exports = {
       gasMultiplier: 1.2,
       timeout: 60000,
     },
+  },
+  etherscan: {
+    apiKey: {
+      goerli: process.env.ETHERSCAN_API_KEY
+    }
   },
   solidity: {
     version: "0.8.9",

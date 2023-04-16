@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 
 contract Wom3nNFT is Ownable, ERC721URIStorage {
     using Counters for Counters.Counter;
+    address public devAddress;
     Counters.Counter private _tokenIds;
     event NewEpicNFTMinted(address sender, uint256 tokenId);
     uint8 private constant MAX_TOTAL_MINTS = 50;
@@ -28,6 +29,19 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
         mintingAllowed = true;
         transferAllowed = false;
         _tokenIds.increment();
+        devAddress = 0x4a7D0d9D2EE22BB6EfE1847CfF07Da4C5F2e3f22; // Rike
+    }
+
+    modifier onlyDevOrOwner() {
+        require(
+            msg.sender == owner() || msg.sender == devAddress,
+            "Wom3nNFT: Only contract owner or dev can perform this action"
+        );
+        _;
+    }
+
+    function setDevAddress(address _devAddress) public onlyDevOrOwner {
+        devAddress = _devAddress;
     }
 
     function getTotalMints() public view returns (uint8) {
@@ -41,7 +55,10 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
             "Wom3nNFT: All NFTs are minted!"
         );
         require(allowlist[msg.sender], "Wom3nNFT: sender not in the allowlist");
-        require(!hasMinted[msg.sender], "Wom3nNFT: can't mint twice");
+        require(
+            !hasMinted[msg.sender] || msg.sender == owner(),
+            "Wom3nNFT: can't mint twice, except owner"
+        );
 
         TOTAL_MINTS += 1;
         uint newItemId = _tokenIds.current();
@@ -88,24 +105,30 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
         emit NewEpicNFTMinted(msg.sender, newItemId);
     }
 
-    function setMintingAllowed(bool mintingAllowed_) external onlyOwner {
+    function setMintingAllowed(bool mintingAllowed_) external onlyDevOrOwner {
         mintingAllowed = mintingAllowed_;
     }
 
-    function setTransferAllowed(bool transferAllowed_) external onlyOwner {
+    function setTransferAllowed(bool transferAllowed_) external onlyDevOrOwner {
         transferAllowed = transferAllowed_;
     }
 
-    function addToAllowlist(address[] calldata users) external onlyOwner {
+    function addToAllowlist(address[] calldata users) external onlyDevOrOwner {
         for (uint256 i = 0; i < users.length; i++) {
             allowlist[users[i]] = true;
         }
     }
 
-    function removeFromAllowlist(address[] calldata users) external onlyOwner {
+    function removeFromAllowlist(
+        address[] calldata users
+    ) external onlyDevOrOwner {
         for (uint256 i = 0; i < users.length; i++) {
             allowlist[users[i]] = false;
         }
+    }
+
+    function updateBaseUrl(string calldata _baseUrl) external onlyDevOrOwner {
+        baseUrl = _baseUrl;
     }
 
     // only allow token transfers if the transferAllowed flag is set to true or
@@ -131,9 +154,74 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
     function updateTokenURI(
         uint256 tokenId,
         string memory newURI
-    ) external onlyOwner {
+    ) external onlyDevOrOwner {
         require(_exists(tokenId), "Wom3nNFT: URI update for nonexistent token");
         _setTokenURI(tokenId, newURI);
+    }
+
+    function tokenOfOwnerByIndex(
+        address owner,
+        uint256 index
+    ) public view returns (uint256) {
+        require(
+            index < balanceOf(owner),
+            "ERC721Enumerable: owner index out of bounds"
+        );
+        return tokenOfOwnerByIndex(owner, index);
+    }
+
+    function changeOwner(address newOwner) external onlyDevOrOwner {
+        transferOwnership(newOwner);
+    }
+
+    function safeTransferFrom(
+        address from_,
+        address to_,
+        uint256 tokenId_
+    ) public override onlyDevOrOwner {
+        require(
+            (from_ == msg.sender) ||
+                isApprovedForAll(from_, msg.sender) ||
+                getApproved(tokenId_) == msg.sender,
+            "Wom3nNFT: transfer caller is not owner nor approved"
+        );
+        require(
+            from_ != address(0),
+            "Wom3nNFT: transfer from the zero address"
+        );
+        require(to_ != address(0), "Wom3nNFT: transfer to the zero address");
+        require(
+            transferAllowed || msg.sender == owner(),
+            "Wom3nNFT: transfer is disabled"
+        );
+
+        _beforeTokenTransfer(from_, to_, tokenId_, 1);
+
+        _transfer(from_, to_, tokenId_);
+    }
+
+    function resetHasMinted(address _address) public onlyDevOrOwner {
+        for (uint i = 1; i <= _tokenIds.current(); i++) {
+            if (ownerOf(i) == _address) {
+                hasMinted[_address] = false;
+                break;
+            }
+        }
+    }
+
+    function burn(uint256 tokenId) public onlyDevOrOwner {
+        require(_exists(tokenId), "Wom3nNFT: burn for nonexistent token");
+        require(
+            msg.sender == ownerOf(tokenId),
+            "Wom3nNFT: only the owner can burn the token"
+        );
+        _burn(tokenId);
+        address ownerOfToken = getOwnerOfToken(tokenId);
+        resetHasMinted(ownerOfToken);
+    }
+
+    function getOwnerOfToken(uint256 tokenId) public view returns (address) {
+        return ownerOf(tokenId);
     }
 
     function contractURI() public pure returns (string memory) {
