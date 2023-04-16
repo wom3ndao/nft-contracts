@@ -3,13 +3,14 @@
 pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
-contract Wom3nNFT is Ownable, ERC721URIStorage {
+contract Wom3nNFT is Ownable, ERC721URIStorage, ERC721Enumerable {
     using Counters for Counters.Counter;
     address public devAddress;
     Counters.Counter private _tokenIds;
@@ -138,7 +139,7 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
         address to_,
         uint256 tokenId_,
         uint256 batchSize_
-    ) internal virtual override(ERC721) {
+    ) internal virtual override(ERC721, ERC721Enumerable) {
         require(
             from_ == address(0) ||
                 to_ == address(0) ||
@@ -157,17 +158,6 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
     ) external onlyDevOrOwner {
         require(_exists(tokenId), "Wom3nNFT: URI update for nonexistent token");
         _setTokenURI(tokenId, newURI);
-    }
-
-    function tokenOfOwnerByIndex(
-        address owner,
-        uint256 index
-    ) public view returns (uint256) {
-        require(
-            index < balanceOf(owner),
-            "ERC721Enumerable: owner index out of bounds"
-        );
-        return tokenOfOwnerByIndex(owner, index);
     }
 
     function changeOwner(address newOwner) external onlyDevOrOwner {
@@ -222,6 +212,41 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
 
     function getOwnerOfToken(uint256 tokenId) public view returns (address) {
         return ownerOf(tokenId);
+    }
+
+    function tokenOfOwnerByIndex(
+        address owner,
+        uint256 index
+    ) public view override(ERC721Enumerable) returns (uint256) {
+        require(
+            index < balanceOf(owner),
+            "ERC721Enumerable: owner index out of bounds"
+        );
+        return super.tokenOfOwnerByIndex(owner, index);
+    }
+
+    function _burn(
+        uint256 tokenId
+    ) internal override(ERC721, ERC721URIStorage) {
+        super._burn(tokenId);
+    }
+
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override(ERC721, ERC721Enumerable) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
+
+    function tokenURI(
+        uint256 tokenId
+    )
+        public
+        view
+        virtual
+        override(ERC721, ERC721URIStorage)
+        returns (string memory)
+    {
+        return string(abi.encodePacked(baseUrl, tokenId.toString()));
     }
 
     function contractURI() public pure returns (string memory) {
