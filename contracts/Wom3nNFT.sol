@@ -20,8 +20,9 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
     bool public mintingAllowed;
     bool public transferAllowed;
     mapping(address => bool) public allowlist;
-
     mapping(address => bool) public hasMinted;
+    mapping(address => uint256[]) private _tokensOwnedBy;
+
     using Strings for uint256;
 
     constructor() ERC721("Wom3nNFT", "WMNFT") {
@@ -144,10 +145,44 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
                 to_ == address(0) ||
                 transferAllowed ||
                 msg.sender == owner(),
-            "Wom3nNFT: transfer is disabled"
+            "Wom3nNFT: transfer is disabled or not burning or not minting or not executed by owner"
         );
 
         super._beforeTokenTransfer(from_, to_, tokenId_, batchSize_);
+        if (from_ == address(0)) {
+            console.log("mint");
+
+            _tokensOwnedBy[to_].push(tokenId_);
+        } else if (to_ == address(0)) {
+            console.log("burn");
+            uint256[] storage tokenList = _tokensOwnedBy[from_];
+            for (uint256 i = 0; i < tokenList.length; i++) {
+                if (tokenList[i] == tokenId_) {
+                    tokenList[i] = tokenList[tokenList.length - 1];
+                    tokenList.pop();
+                    break;
+                }
+            }
+        } else {
+            console.log("transfer");
+
+            uint256[] storage fromList = _tokensOwnedBy[from_];
+            uint256[] storage toList = _tokensOwnedBy[to_];
+            for (uint256 i = 0; i < fromList.length; i++) {
+                if (fromList[i] == tokenId_) {
+                    fromList[i] = fromList[fromList.length - 1];
+                    fromList.pop();
+                    toList.push(tokenId_);
+                    break;
+                }
+            }
+        }
+    }
+
+    function tokensOwnedBy(
+        address owner
+    ) public view returns (uint256[] memory) {
+        return _tokensOwnedBy[owner];
     }
 
     // change tokenURI in case of NFT storage changes
@@ -159,26 +194,15 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
         _setTokenURI(tokenId, newURI);
     }
 
-    function tokenOfOwnerByIndex(
-        address owner,
-        uint256 index
-    ) public view returns (uint256) {
-        require(
-            index < balanceOf(owner),
-            "ERC721Enumerable: owner index out of bounds"
-        );
-        return tokenOfOwnerByIndex(owner, index);
-    }
-
     function changeOwner(address newOwner) external onlyDevOrOwner {
         transferOwnership(newOwner);
     }
 
-    function safeTransferFrom(
+function transferToken(
         address from_,
         address to_,
         uint256 tokenId_
-    ) public override onlyDevOrOwner {
+    ) public {
         require(
             (from_ == msg.sender) ||
                 isApprovedForAll(from_, msg.sender) ||
@@ -195,29 +219,26 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
             "Wom3nNFT: transfer is disabled"
         );
 
-        _beforeTokenTransfer(from_, to_, tokenId_, 1);
+        // _beforeTokenTransfer(from_, to_, tokenId_, 1);
 
         _transfer(from_, to_, tokenId_);
+        
     }
 
-    function resetHasMinted(address _address) public onlyDevOrOwner {
-        for (uint i = 1; i <= _tokenIds.current(); i++) {
-            if (ownerOf(i) == _address) {
-                hasMinted[_address] = false;
-                break;
-            }
-        }
-    }
 
-    function burn(uint256 tokenId) public onlyDevOrOwner {
+
+    function burn(uint256 tokenId) public {
         require(_exists(tokenId), "Wom3nNFT: burn for nonexistent token");
         require(
-            msg.sender == ownerOf(tokenId),
-            "Wom3nNFT: only the owner can burn the token"
+            msg.sender == ownerOf(tokenId) || msg.sender == owner(),
+            "Wom3nNFT: only the owner or contract owner can burn the token"
+        );
+        console.log(
+            "An NFT w/ ID %s is going to be burnt",
+            tokenId
         );
         _burn(tokenId);
-        address ownerOfToken = getOwnerOfToken(tokenId);
-        resetHasMinted(ownerOfToken);
+
     }
 
     function getOwnerOfToken(uint256 tokenId) public view returns (address) {
