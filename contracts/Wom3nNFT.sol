@@ -219,8 +219,6 @@ function transferToken(
             "Wom3nNFT: transfer is disabled"
         );
 
-        // _beforeTokenTransfer(from_, to_, tokenId_, 1);
-
         _transfer(from_, to_, tokenId_);
         
     }
