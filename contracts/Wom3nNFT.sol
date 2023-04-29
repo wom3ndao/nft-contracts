@@ -3,16 +3,15 @@
 pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/interfaces/IERC165.sol";
 
-contract Wom3nNFT is Ownable, ERC721URIStorage {
-    using Counters for Counters.Counter;
+contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
     address public devAddress;
-    Counters.Counter private _tokenIds;
     event NewEpicNFTMinted(address sender, uint256 tokenId);
     uint8 private constant MAX_TOTAL_MINTS = 50;
     uint8 private TOTAL_MINTS = 0;
@@ -22,14 +21,13 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
     mapping(address => bool) public allowlist;
     mapping(address => bool) public hasMinted;
     mapping(address => uint256[]) private _tokensOwnedBy;
-
+    uint256 private _nextTokenId = 1;
     using Strings for uint256;
 
     constructor() ERC721("Wom3nNFT", "WMNFT") {
         baseUrl = "https://bafybeihocfptf5aemeo3iuk6hi6ibccbfjemco4xuwzs7sexxqjpssolee.ipfs.nftstorage.link/";
         mintingAllowed = true;
         transferAllowed = false;
-        _tokenIds.increment();
         devAddress = 0x4a7D0d9D2EE22BB6EfE1847CfF07Da4C5F2e3f22; // Rike
     }
 
@@ -62,41 +60,14 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
         );
 
         TOTAL_MINTS += 1;
-        uint newItemId = _tokenIds.current();
+        uint256 newItemId = _nextTokenId;
 
-        string memory json = Base64.encode(
-            bytes(
-                string(
-                    abi.encodePacked(
-                        '{"name": "',
-                        string(
-                            abi.encodePacked(
-                                "wom3n.DAO NFT #",
-                                newItemId.toString()
-                            )
-                        ),
-                        '", "description": "wom3n.DAO - the dynamic hub for the next-gen digital female leaders and creatives, igniting innovation, growth, and impact in Web3.", "image": "',
-                        string(
-                            abi.encodePacked(
-                                baseUrl,
-                                "WiB-Avatar-",
-                                newItemId.toString(),
-                                ".png"
-                            )
-                        ),
-                        '"}'
-                    )
-                )
-            )
-        );
+        string memory finalTokenUri = _constructTokenURI(newItemId);
 
-        string memory finalTokenUri = string(
-            abi.encodePacked("data:application/json;base64,", json)
-        );
 
         _safeMint(msg.sender, newItemId);
         _setTokenURI(newItemId, finalTokenUri);
-        _tokenIds.increment();
+        _nextTokenId += 1;
         hasMinted[msg.sender] = true;
         console.log(
             "An NFT w/ ID %s has been minted to %s",
@@ -132,6 +103,37 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
         baseUrl = _baseUrl;
     }
 
+    function _constructTokenURI(uint256 tokenId) internal view returns (string memory) {
+    string memory baseURI = baseUrl;
+     string memory json = Base64.encode(
+            bytes(
+                string(
+                    abi.encodePacked(
+                        '{"name": "',
+                        string(
+                            abi.encodePacked(
+                                "wom3n.DAO NFT #",
+                                tokenId.toString()
+                            )
+                        ),
+                        '", "description": "wom3n.DAO - the dynamic hub for the next-gen digital female leaders and creatives, igniting innovation, growth, and impact in Web3.", "image": "',
+                        string(
+                            abi.encodePacked(
+                                baseUrl,
+                                "WiB-Avatar-",
+                                tokenId.toString(),
+                                ".png"
+                            )
+                        ),
+                        '"}'
+                    )
+                )
+            )
+        );
+    console.log(json);
+    return string(abi.encodePacked("data:application/json;base64,", json));
+}
+
     // only allow token transfers if the transferAllowed flag is set to true or
     // if the operation is a minting or burning operation or the sender is owner
     function _beforeTokenTransfer(
@@ -139,7 +141,7 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
         address to_,
         uint256 tokenId_,
         uint256 batchSize_
-    ) internal virtual override(ERC721) {
+    ) internal virtual override(ERC721, ERC721Enumerable) {
         require(
             from_ == address(0) ||
                 to_ == address(0) ||
@@ -151,7 +153,6 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
         super._beforeTokenTransfer(from_, to_, tokenId_, batchSize_);
         if (from_ == address(0)) {
             console.log("mint");
-
             _tokensOwnedBy[to_].push(tokenId_);
         } else if (to_ == address(0)) {
             console.log("burn");
@@ -198,7 +199,7 @@ contract Wom3nNFT is Ownable, ERC721URIStorage {
         transferOwnership(newOwner);
     }
 
-function transferToken(
+    function transferToken(
         address from_,
         address to_,
         uint256 tokenId_
@@ -220,10 +221,7 @@ function transferToken(
         );
 
         _transfer(from_, to_, tokenId_);
-        
     }
-
-
 
     function burn(uint256 tokenId) public {
         require(_exists(tokenId), "Wom3nNFT: burn for nonexistent token");
@@ -231,12 +229,8 @@ function transferToken(
             msg.sender == ownerOf(tokenId) || msg.sender == owner(),
             "Wom3nNFT: only the owner or contract owner can burn the token"
         );
-        console.log(
-            "An NFT w/ ID %s is going to be burnt",
-            tokenId
-        );
+        console.log("An NFT w/ ID %s is going to be burnt", tokenId);
         _burn(tokenId);
-
     }
 
     function getOwnerOfToken(uint256 tokenId) public view returns (address) {
@@ -275,5 +269,37 @@ function transferToken(
                     Base64.encode(bytes(json))
                 )
             );
+    }
+
+    function supportsInterface(
+        bytes4 interfaceId
+    )
+        public
+        view
+        virtual
+        override(ERC721, ERC721Enumerable, IERC165)
+        returns (bool)
+    {
+        return
+            interfaceId == type(IERC165).interfaceId ||
+            super.supportsInterface(interfaceId);
+    }
+
+    function tokenURI(
+        uint256 tokenId
+    ) public view override(ERC721, ERC721URIStorage) returns (string memory) {
+        require(
+            _exists(tokenId),
+            "ERC721Metadata: URI query for nonexistent token"
+        );
+
+        return _constructTokenURI(tokenId);
+
+    }
+
+    function _burn(
+        uint256 tokenId
+    ) internal virtual override(ERC721, ERC721URIStorage) {
+        super._burn(tokenId);
     }
 }
