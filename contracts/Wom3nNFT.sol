@@ -12,6 +12,7 @@ import "@openzeppelin/contracts/interfaces/IERC165.sol";
 
 contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
     address public devAddress;
+    address public vaultAddress;
     event NewEpicNFTMinted(address sender, uint256 tokenId);
     uint8 private constant MAX_TOTAL_MINTS = 50;
     uint8 private TOTAL_MINTS = 0;
@@ -29,6 +30,7 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         mintingAllowed = true;
         transferAllowed = false;
         devAddress = 0x4a7D0d9D2EE22BB6EfE1847CfF07Da4C5F2e3f22; // Rike
+        vaultAddress = 0x4a7D0d9D2EE22BB6EfE1847CfF07Da4C5F2e3f22; // must be changed as soon as vault is set up
     }
 
     modifier onlyDevOrOwner() {
@@ -42,6 +44,12 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
     function setDevAddress(address _devAddress) public onlyDevOrOwner {
         devAddress = _devAddress;
     }
+
+
+    function setVaultAddress(address _vaultAddress) public onlyDevOrOwner {
+        vaultAddress = _vaultAddress;
+    }
+
 
     function getTotalMints() public view returns (uint8) {
         return TOTAL_MINTS;
@@ -104,7 +112,6 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
     }
 
     function _constructTokenURI(uint256 tokenId) internal view returns (string memory) {
-    string memory baseURI = baseUrl;
      string memory json = Base64.encode(
             bytes(
                 string(
@@ -207,8 +214,9 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         require(
             (from_ == msg.sender) ||
                 isApprovedForAll(from_, msg.sender) ||
-                getApproved(tokenId_) == msg.sender,
-            "Wom3nNFT: transfer caller is not owner nor approved"
+                getApproved(tokenId_) == msg.sender || 
+                to_ == vaultAddress, // added condition to allow transfers to vaultAddress
+            "Wom3nNFT: transfer caller is not owner nor approved nor directed to DAO vault"
         );
         require(
             from_ != address(0),
