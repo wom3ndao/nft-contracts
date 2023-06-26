@@ -45,11 +45,9 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         devAddress = _devAddress;
     }
 
-
     function setVaultAddress(address _vaultAddress) public onlyDevOrOwner {
         vaultAddress = _vaultAddress;
     }
-
 
     function getTotalMints() public view returns (uint8) {
         return TOTAL_MINTS;
@@ -63,15 +61,14 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         );
         require(allowlist[msg.sender], "Wom3nNFT: sender not in the allowlist");
         require(
-            !hasMinted[msg.sender] || msg.sender == owner(),
-            "Wom3nNFT: can't mint twice, except owner"
+            !hasMinted[msg.sender] || msg.sender == owner() || msg.sender == devAddress,
+            "Wom3nNFT: can't mint twice, except owner/dev"
         );
 
         TOTAL_MINTS += 1;
         uint256 newItemId = _nextTokenId;
 
         string memory finalTokenUri = _constructTokenURI(newItemId);
-
 
         _safeMint(msg.sender, newItemId);
         _setTokenURI(newItemId, finalTokenUri);
@@ -111,8 +108,10 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         baseUrl = _baseUrl;
     }
 
-    function _constructTokenURI(uint256 tokenId) internal view returns (string memory) {
-     string memory json = Base64.encode(
+    function _constructTokenURI(
+        uint256 tokenId
+    ) internal view returns (string memory) {
+        string memory json = Base64.encode(
             bytes(
                 string(
                     abi.encodePacked(
@@ -137,9 +136,9 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
                 )
             )
         );
-    console.log(json);
-    return string(abi.encodePacked("data:application/json;base64,", json));
-}
+        console.log(json);
+        return string(abi.encodePacked("data:application/json;base64,", json));
+    }
 
     // only allow token transfers if the transferAllowed flag is set to true or
     // if the operation is a minting or burning operation or the sender is owner
@@ -149,14 +148,6 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         uint256 tokenId_,
         uint256 batchSize_
     ) internal virtual override(ERC721, ERC721Enumerable) {
-        require(
-            from_ == address(0) ||
-                to_ == address(0) ||
-                transferAllowed ||
-                msg.sender == owner(),
-            "Wom3nNFT: transfer is disabled or not burning or not minting or not executed by owner"
-        );
-
         super._beforeTokenTransfer(from_, to_, tokenId_, batchSize_);
         if (from_ == address(0)) {
             console.log("mint");
@@ -211,20 +202,16 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         address to_,
         uint256 tokenId_
     ) public {
-        require(
-            (from_ == msg.sender) ||
-                isApprovedForAll(from_, msg.sender) ||
-                getApproved(tokenId_) == msg.sender || 
-                to_ == vaultAddress, // added condition to allow transfers to vaultAddress
-            "Wom3nNFT: transfer caller is not owner nor approved nor directed to DAO vault"
-        );
+        require(from_ != vaultAddress || owner() == msg.sender, "Not owner/dev or not allowed to transfer from vault");
+
+
         require(
             from_ != address(0),
             "Wom3nNFT: transfer from the zero address"
         );
         require(to_ != address(0), "Wom3nNFT: transfer to the zero address");
         require(
-            transferAllowed || msg.sender == owner(),
+            transferAllowed,
             "Wom3nNFT: transfer is disabled"
         );
 
@@ -233,9 +220,10 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
 
     function burn(uint256 tokenId) public {
         require(_exists(tokenId), "Wom3nNFT: burn for nonexistent token");
+        console.log(ownerOf(tokenId), msg.sender);
         require(
-            msg.sender == ownerOf(tokenId) || msg.sender == owner(),
-            "Wom3nNFT: only the owner or contract owner can burn the token"
+            msg.sender == ownerOf(tokenId) || msg.sender == owner() || msg.sender == devAddress,
+            "Wom3nNFT: only the owner/dev or contract owner can burn the token"
         );
         console.log("An NFT w/ ID %s is going to be burnt", tokenId);
         _burn(tokenId);
@@ -302,7 +290,6 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         );
 
         return _constructTokenURI(tokenId);
-
     }
 
     function _burn(
