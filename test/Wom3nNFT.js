@@ -113,6 +113,19 @@ describe("Wom3nNFT", async function () {
     // We check if the contract's base URL is the same as the new one
     expect(contractBaseURL).to.equal(newBaseURL);
   });
+
+  it("Should mint any token and then in correct order", async function () {
+    await contractDeployed.addToAllowlist([await contractDeployed.owner()]);
+    await contractDeployed.mintID(2);
+    expect((await contractDeployed.getTotalMints()).toString()).to.equal("1");
+    await contractDeployed.mint();
+    await contractDeployed.mint();
+    expect((await contractDeployed.getTotalMints()).toString()).to.equal("3");
+    expect((await contractDeployed.mintedTokens(1)).toString()).to.equal("true");
+    expect((await contractDeployed.mintedTokens(2)).toString()).to.equal("true");
+    expect((await contractDeployed.mintedTokens(3)).toString()).to.equal("true");
+    expect((await contractDeployed.mintedTokens(4)).toString()).to.equal("false");
+  });
 });
 
 

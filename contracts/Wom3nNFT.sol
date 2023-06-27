@@ -24,6 +24,7 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
     mapping(address => uint256[]) private _tokensOwnedBy;
     uint256 private _nextTokenId = 1;
     using Strings for uint256;
+    mapping(uint256 => bool) public mintedTokens;
 
     constructor() ERC721("Wom3nNFT", "WMNFT") {
         baseUrl = "https://bafybeihocfptf5aemeo3iuk6hi6ibccbfjemco4xuwzs7sexxqjpssolee.ipfs.nftstorage.link/";
@@ -53,6 +54,33 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         return TOTAL_MINTS;
     }
 
+    function mintID(uint256 id) public onlyDevOrOwner {
+        require(mintingAllowed, "Wom3nNFT: minting is disabled");
+        require(
+            TOTAL_MINTS < MAX_TOTAL_MINTS,
+            "Wom3nNFT: All NFTs are minted!"
+        );
+        require(id > 0 && id <= MAX_TOTAL_MINTS, "Wom3nNFT: Invalid token ID");
+        require(!mintedTokens[id], "Wom3nNFT: Token already minted");
+        require(
+            !hasMinted[msg.sender] ||
+                msg.sender == owner() ||
+                msg.sender == devAddress,
+            "Wom3nNFT: can't mint twice, except owner/dev"
+        );
+
+        TOTAL_MINTS += 1;
+
+        string memory finalTokenUri = _constructTokenURI(id);
+
+        _safeMint(msg.sender, id);
+        _setTokenURI(id, finalTokenUri);
+        hasMinted[msg.sender] = true;
+        mintedTokens[id] = true;
+        console.log("An NFT w/ ID %s has been minted to %s", id, msg.sender);
+        emit NewEpicNFTMinted(msg.sender, id);
+    }
+
     function mint() public {
         require(mintingAllowed, "Wom3nNFT: minting is disabled");
         require(
@@ -61,19 +89,29 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         );
         require(allowlist[msg.sender], "Wom3nNFT: sender not in the allowlist");
         require(
-            !hasMinted[msg.sender] || msg.sender == owner() || msg.sender == devAddress,
+            !hasMinted[msg.sender] ||
+                msg.sender == owner() ||
+                msg.sender == devAddress,
             "Wom3nNFT: can't mint twice, except owner/dev"
         );
 
-        TOTAL_MINTS += 1;
         uint256 newItemId = _nextTokenId;
+        // Check if token was already minted, if so skip to the next one
+        while (mintedTokens[newItemId]) {
+            newItemId += 1;
+        }
+
+        require(newItemId <= MAX_TOTAL_MINTS, "Wom3nNFT: All NFTs are minted!");
+
+        TOTAL_MINTS += 1;
 
         string memory finalTokenUri = _constructTokenURI(newItemId);
 
         _safeMint(msg.sender, newItemId);
         _setTokenURI(newItemId, finalTokenUri);
-        _nextTokenId += 1;
+        _nextTokenId = newItemId + 1;
         hasMinted[msg.sender] = true;
+        mintedTokens[newItemId] = true;
         console.log(
             "An NFT w/ ID %s has been minted to %s",
             newItemId,
@@ -136,7 +174,6 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
                 )
             )
         );
-        console.log(json);
         return string(abi.encodePacked("data:application/json;base64,", json));
     }
 
@@ -202,18 +239,17 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         address to_,
         uint256 tokenId_
     ) public {
-        require(from_ != vaultAddress || owner() == msg.sender, "Not owner/dev or not allowed to transfer from vault");
-
+        require(
+            from_ != vaultAddress || owner() == msg.sender,
+            "Not owner/dev or not allowed to transfer from vault"
+        );
 
         require(
             from_ != address(0),
             "Wom3nNFT: transfer from the zero address"
         );
         require(to_ != address(0), "Wom3nNFT: transfer to the zero address");
-        require(
-            transferAllowed,
-            "Wom3nNFT: transfer is disabled"
-        );
+        require(transferAllowed, "Wom3nNFT: transfer is disabled");
 
         _transfer(from_, to_, tokenId_);
     }
@@ -222,7 +258,9 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         require(_exists(tokenId), "Wom3nNFT: burn for nonexistent token");
         console.log(ownerOf(tokenId), msg.sender);
         require(
-            msg.sender == ownerOf(tokenId) || msg.sender == owner() || msg.sender == devAddress,
+            msg.sender == ownerOf(tokenId) ||
+                msg.sender == owner() ||
+                msg.sender == devAddress,
             "Wom3nNFT: only the owner/dev or contract owner can burn the token"
         );
         console.log("An NFT w/ ID %s is going to be burnt", tokenId);
