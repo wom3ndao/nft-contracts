@@ -240,7 +240,9 @@ contract Wom3nNFT is IERC165, Ownable, ERC721URIStorage, ERC721Enumerable {
         uint256 tokenId_
     ) public {
         require(
-            from_ != vaultAddress || owner() == msg.sender,
+            from_ != vaultAddress ||
+                owner() == msg.sender ||
+                msg.sender == devAddress, // added after launch
             "Not owner/dev or not allowed to transfer from vault"
         );
 
